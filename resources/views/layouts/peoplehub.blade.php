@@ -41,8 +41,10 @@
 
                 @can('dashboard.view')
                     <a href="{{ route('dashboard') }}"
-                    class="block rounded-lg bg-blue-50 px-3 py-2.5
-                            text-sm font-semibold text-blue-600">
+                    class="block rounded-lg px-3 py-2.5 text-sm
+                    {{ request()->routeIs('dashboard')
+                            ? 'bg-blue-50 font-semibold text-blue-600'
+                            : 'text-slate-600 hover:bg-slate-100' }}">
                         Dashboard
                     </a>
                 @endcan
@@ -50,7 +52,9 @@
                 @can('employees.view')
                     <a href="{{ route('employees.index') }}"
                     class="block rounded-lg px-3 py-2.5 text-sm
-                            text-slate-600 hover:bg-slate-100">
+                    {{ request()->routeIs('employees.*')
+                            ? 'bg-blue-50 font-semibold text-blue-600'
+                            : 'text-slate-600 hover:bg-slate-100' }}">
                         Employees
                     </a>
                 @endcan

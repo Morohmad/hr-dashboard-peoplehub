@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Models\Position;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
 class EmployeeController extends Controller
@@ -53,6 +54,7 @@ class EmployeeController extends Controller
         $query = (clone $baseQuery)
             ->with(['department', 'position', 'manager']);
 
+        // Search.
         if ($request->filled('search')) {
             $search = $request->search;
 
@@ -64,10 +66,12 @@ class EmployeeController extends Controller
             });
         }
 
+        // Filter department.
         if ($request->filled('department_id')) {
             $query->where('department_id', $request->department_id);
         }
 
+        // Filter employment status.
         if ($request->filled('employment_status')) {
             $query->where(
                 'employment_status',
@@ -75,6 +79,7 @@ class EmployeeController extends Controller
             );
         }
 
+        // Pagination.
         $employees = $query
             ->latest()
             ->paginate(10)
@@ -136,13 +141,13 @@ class EmployeeController extends Controller
      */
     public function show(Employee $employee): View
     {
-        $this->authorize('view', $employee);
+        Gate::authorize('view', $employee);
 
         $employee->load([
             'department',
             'position',
             'manager',
-            'subordinates',
+            'subordinates.position',
             'user',
         ]);
 
@@ -154,7 +159,7 @@ class EmployeeController extends Controller
      */
     public function edit(Employee $employee): View
     {
-        $this->authorize('update', $employee);
+        Gate::authorize('update', $employee);
 
         $departments = Department::where('is_active', true)
             ->orderBy('name')
@@ -184,6 +189,7 @@ class EmployeeController extends Controller
         UpdateEmployeeRequest $request,
         Employee $employee
     ): RedirectResponse {
+        // Authorization sudah dilakukan oleh UpdateEmployeeRequest.
         $employee->update($request->validated());
 
         return redirect()
@@ -196,7 +202,7 @@ class EmployeeController extends Controller
      */
     public function destroy(Employee $employee): RedirectResponse
     {
-        $this->authorize('delete', $employee);
+        Gate::authorize('delete', $employee);
 
         $employee->delete();
 

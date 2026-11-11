@@ -84,4 +84,9 @@ class Employee extends Model
     {
         return $query->where('department_id', $departmentId);
     }
+
+    public function leaves(): HasMany
+    {
+        return $this->hasMany(Leave::class);
+    }
 }

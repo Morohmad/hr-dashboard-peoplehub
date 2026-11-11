@@ -104,10 +104,12 @@
 
                 {{-- Leave Management --}}
                 @can('leaves.view')
-                    <a href="#"
-                       class="flex items-center rounded-lg border-l-4 border-transparent
-                              px-3 py-2.5 text-sm text-slate-600
-                              transition-colors duration-200 hover:bg-slate-100 hover:text-blue-600">
+                    <a href="{{ route('leaves.index') }}"
+                       class="flex items-center rounded-lg px-3 py-2.5 text-sm
+                       transition-colors duration-200
+                       {{ request()->routeIs('leaves.*')
+                            ? 'border-l-4 border-blue-600 bg-blue-50 font-semibold text-blue-700'
+                            : 'border-l-4 border-transparent text-slate-600 hover:bg-slate-100 hover:text-blue-600' }}">
                         Leave Management
                     </a>
                 @endcan

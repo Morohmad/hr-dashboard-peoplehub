@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\PositionController;
+use App\Http\Controllers\AttendanceController;
 
 Route::get('/', function () {
     return redirect()->route('dashboard');
@@ -37,6 +38,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Position Management
     Route::resource('positions', PositionController::class)
         ->middleware('permission:positions.view');
+    
+    // Attendance Management
+    Route::get('/attendance', [AttendanceController::class, 'index'])
+        ->middleware('permission:attendance.view')
+        ->name('attendance.index');
+
+    Route::post('/attendance/check-in', [AttendanceController::class, 'checkIn'])
+        ->middleware('permission:attendance.view')
+        ->name('attendance.check-in');
+
+    Route::post('/attendance/check-out', [AttendanceController::class, 'checkOut'])
+        ->middleware('permission:attendance.view')
+        ->name('attendance.check-out');
 
     // Payroll placeholder
     Route::middleware('permission:payroll.view')->group(function () {

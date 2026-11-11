@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Attendance;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -62,6 +63,11 @@ class Employee extends Model
     public function subordinates(): HasMany
     {
         return $this->hasMany(Employee::class, 'manager_id');
+    }
+
+    public function attendances(): HasMany
+    {
+        return $this->hasMany(Attendance::class);
     }
 
     public function getFullNameAttribute(): string

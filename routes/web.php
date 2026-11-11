@@ -1,13 +1,12 @@
 <?php
 
-use App\Models\Employee;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\PositionController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\LeaveController;
-
+use App\Http\Controllers\DashboardController;
 
 Route::get('/', function () {
     return redirect()->route('dashboard');
@@ -15,19 +14,10 @@ Route::get('/', function () {
 
 Route::middleware(['auth', 'verified'])->group(function () {
 
-    Route::get('/dashboard', function () {
-        $totalEmployees = Employee::count();
-
-        $activeEmployees = Employee::where(
-            'employment_status',
-            'active'
-        )->count();
-
-        return view('dashboard', compact(
-            'totalEmployees',
-            'activeEmployees'
-        ));
-    })->name('dashboard');
+    // Dashboard
+    Route::get('/dashboard', [DashboardController::class, 'index'])
+        ->middleware('permission:dashboard.view')
+        ->name('dashboard');
 
     // Employee Management
     Route::resource('employees', EmployeeController::class)
@@ -40,7 +30,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Position Management
     Route::resource('positions', PositionController::class)
         ->middleware('permission:positions.view');
-    
+
     // Attendance Management
     Route::get('/attendance', [AttendanceController::class, 'index'])
         ->middleware('permission:attendance.view')
@@ -53,43 +43,36 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/attendance/check-out', [AttendanceController::class, 'checkOut'])
         ->middleware('permission:attendance.view')
         ->name('attendance.check-out');
-    
+
     // Leave Management
     Route::prefix('leaves')
         ->name('leaves.')
         ->group(function () {
 
-            // Menampilkan daftar pengajuan cuti
             Route::get('/', [LeaveController::class, 'index'])
                 ->middleware('permission:leaves.view')
                 ->name('index');
 
-            // Form pengajuan cuti
             Route::get('/create', [LeaveController::class, 'create'])
                 ->middleware('permission:leaves.create')
                 ->name('create');
 
-            // Menyimpan pengajuan cuti
             Route::post('/', [LeaveController::class, 'store'])
                 ->middleware('permission:leaves.create')
                 ->name('store');
 
-            // Melihat detail pengajuan
             Route::get('/{leave}', [LeaveController::class, 'show'])
                 ->middleware('permission:leaves.view')
                 ->name('show');
 
-            // Menyetujui pengajuan
             Route::post('/{leave}/approve', [LeaveController::class, 'approve'])
                 ->middleware('permission:leaves.approve')
                 ->name('approve');
 
-            // Menolak pengajuan
             Route::post('/{leave}/reject', [LeaveController::class, 'reject'])
                 ->middleware('permission:leaves.approve')
                 ->name('reject');
 
-            // Membatalkan pengajuan milik sendiri
             Route::delete('/{leave}', [LeaveController::class, 'destroy'])
                 ->middleware('permission:leaves.create')
                 ->name('destroy');

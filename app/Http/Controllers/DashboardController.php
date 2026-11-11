@@ -7,6 +7,7 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Leave;
 use App\Models\Position;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -16,35 +17,97 @@ class DashboardController extends Controller
     {
         $user = $request->user();
 
-        // Employee statistics
-        $employeeQuery = Employee::query();
+        $isEmployee = $user->hasRole('Employee');
+        $isManager = $user->hasRole('Manager');
 
-        // Employee hanya melihat statistik miliknya sendiri
-        if ($user->hasRole('Employee')) {
-            $employeeQuery->where('user_id', $user->id);
-        }
+        $employee = $user->employee;
+        $employeeId = $employee?->id;
 
-        $totalEmployees = (clone $employeeQuery)->count();
+        /*
+        |--------------------------------------------------------------------------
+        | Employee Data Scope
+        |--------------------------------------------------------------------------
+        | Super Admin & HR Admin : seluruh karyawan
+        | Manager                 : dirinya sendiri dan anggota tim langsung
+        | Employee                : dirinya sendiri
+        */
 
-        $activeEmployees = (clone $employeeQuery)
+        $applyEmployeeScope = function (Builder $query) use (
+            $isEmployee,
+            $isManager,
+            $employeeId,
+            $user
+        ) {
+            if ($isEmployee) {
+                if ($employeeId) {
+                    $query->where('id', $employeeId);
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
+            } elseif ($isManager) {
+                if ($employeeId) {
+                    $query->where(function ($subQuery) use ($employeeId) {
+                        $subQuery->where('id', $employeeId)
+                            ->orWhere('manager_id', $employeeId);
+                    });
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
+            }
+        };
+
+        $scopedEmployees = Employee::query();
+        $applyEmployeeScope($scopedEmployees);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Employee Statistics
+        |--------------------------------------------------------------------------
+        */
+
+        $totalEmployees = (clone $scopedEmployees)->count();
+
+        $activeEmployees = (clone $scopedEmployees)
             ->where('employment_status', 'active')
             ->count();
 
-        // Organization statistics
-        $totalDepartments = Department::count();
-        $totalPositions = Position::count();
+        /*
+        |--------------------------------------------------------------------------
+        | Organization Statistics
+        |--------------------------------------------------------------------------
+        */
 
-        // Attendance statistics
+        if ($isEmployee || $isManager) {
+            $totalDepartments = (clone $scopedEmployees)
+                ->whereNotNull('department_id')
+                ->distinct()
+                ->count('department_id');
+
+            $totalPositions = (clone $scopedEmployees)
+                ->whereNotNull('position_id')
+                ->distinct()
+                ->count('position_id');
+        } else {
+            $totalDepartments = Department::count();
+            $totalPositions = Position::count();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Attendance Statistics
+        |--------------------------------------------------------------------------
+        */
+
         $attendanceQuery = Attendance::whereDate(
             'attendance_date',
             today()
         );
 
-        if ($user->hasRole('Employee')) {
-            $attendanceQuery->whereHas('employee', function ($query) use ($user) {
-                $query->where('user_id', $user->id);
-            });
-        }
+        $attendanceQuery->whereHas('employee', function (Builder $query) use (
+            $applyEmployeeScope
+        ) {
+            $applyEmployeeScope($query);
+        });
 
         $presentToday = (clone $attendanceQuery)
             ->where('status', 'present')
@@ -58,12 +121,17 @@ class DashboardController extends Controller
             ->where('status', 'absent')
             ->count();
 
-        // Leave statistics
-        $leaveQuery = Leave::query();
+        /*
+        |--------------------------------------------------------------------------
+        | Leave Statistics
+        |--------------------------------------------------------------------------
+        */
 
-        if (!$user->can('leaves.approve')) {
-            $leaveQuery->where('employee_id', $user->employee?->id);
-        }
+        $leaveQuery = Leave::whereHas('employee', function (Builder $query) use (
+            $applyEmployeeScope
+        ) {
+            $applyEmployeeScope($query);
+        });
 
         $pendingLeaves = (clone $leaveQuery)
             ->where('status', 'pending')
@@ -77,40 +145,67 @@ class DashboardController extends Controller
             ->where('status', 'rejected')
             ->count();
 
-        // Employee by department
+        /*
+        |--------------------------------------------------------------------------
+        | Employees by Department
+        |--------------------------------------------------------------------------
+        */
+
         $employeesByDepartment = Department::withCount([
-            'employees' => function ($query) {
+            'employees' => function (Builder $query) use (
+                $applyEmployeeScope
+            ) {
                 $query->where('employment_status', 'active');
+                $applyEmployeeScope($query);
             }
         ])
+            ->when(
+                $isEmployee || $isManager,
+                function (Builder $query) {
+                    $query->having('employees_count', '>', 0);
+                }
+            )
             ->orderBy('name')
             ->get();
 
-        // Recent leave requests
-        $recentLeavesQuery = Leave::with('employee.department')
+        /*
+        |--------------------------------------------------------------------------
+        | Recent Leave Requests
+        |--------------------------------------------------------------------------
+        */
+
+        $recentLeavesQuery = Leave::with([
+            'employee.department',
+            'employee.position',
+        ])
+            ->whereHas('employee', function (Builder $query) use (
+                $applyEmployeeScope
+            ) {
+                $applyEmployeeScope($query);
+            })
             ->latest()
             ->limit(5);
 
-        if (!$user->can('leaves.approve')) {
-            $recentLeavesQuery->where(
-                'employee_id',
-                $user->employee?->id
-            );
-        }
-
         $recentLeaves = $recentLeavesQuery->get();
 
-        // Recent attendance
-        $recentAttendanceQuery = Attendance::with('employee.department')
+        /*
+        |--------------------------------------------------------------------------
+        | Recent Attendance
+        |--------------------------------------------------------------------------
+        */
+
+        $recentAttendanceQuery = Attendance::with([
+            'employee.department',
+            'employee.position',
+        ])
             ->whereDate('attendance_date', today())
+            ->whereHas('employee', function (Builder $query) use (
+                $applyEmployeeScope
+            ) {
+                $applyEmployeeScope($query);
+            })
             ->latest('check_in')
             ->limit(5);
-
-        if ($user->hasRole('Employee')) {
-            $recentAttendanceQuery->whereHas('employee', function ($query) use ($user) {
-                $query->where('user_id', $user->id);
-            });
-        }
 
         $recentAttendances = $recentAttendanceQuery->get();
 

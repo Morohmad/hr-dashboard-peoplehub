@@ -1,8 +1,10 @@
+
 <?php
 
 use App\Models\Employee;
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\DepartmentController;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return redirect()->route('dashboard');
@@ -10,7 +12,6 @@ Route::get('/', function () {
 
 Route::middleware(['auth', 'verified'])->group(function () {
 
-    // Dashboard
     Route::get('/dashboard', function () {
         $totalEmployees = Employee::count();
 
@@ -30,25 +31,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:employees.view');
 
     // Department Management
-    Route::middleware('permission:departments.view')
-        ->group(function () {
+    Route::resource('departments', DepartmentController::class)
+        ->middleware('permission:departments.view');
 
-            Route::get('/departments', function () {
-                return 'Department Management';
-            })->name('departments.index');
-
-        });
-
-    // Payroll Management
-    Route::middleware('permission:payroll.view')
-        ->group(function () {
-
-            Route::get('/payroll', function () {
-                return 'Payroll Management';
-            })->name('payroll.index');
-
-        });
-
+    // Payroll placeholder
+    Route::middleware('permission:payroll.view')->group(function () {
+        Route::get('/payroll', function () {
+            return 'Payroll Management';
+        })->name('payroll.index');
+    });
 });
 
 require __DIR__.'/auth.php';

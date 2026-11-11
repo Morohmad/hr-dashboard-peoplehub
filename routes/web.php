@@ -1,10 +1,10 @@
-
 <?php
 
 use App\Models\Employee;
+use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\DepartmentController;
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\PositionController;
 
 Route::get('/', function () {
     return redirect()->route('dashboard');
@@ -33,6 +33,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Department Management
     Route::resource('departments', DepartmentController::class)
         ->middleware('permission:departments.view');
+
+    // Position Management
+    Route::resource('positions', PositionController::class)
+        ->middleware('permission:positions.view');
 
     // Payroll placeholder
     Route::middleware('permission:payroll.view')->group(function () {

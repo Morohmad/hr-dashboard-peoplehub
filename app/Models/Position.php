@@ -19,13 +19,6 @@ class Position extends Model
         'is_active',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'is_active' => 'boolean',
-        ];
-    }
-
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);

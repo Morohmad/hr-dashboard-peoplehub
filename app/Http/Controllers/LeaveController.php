@@ -3,12 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Leave;
+use App\Models\ActivityLog;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\Gate;
 
 class LeaveController extends Controller
 {
@@ -79,8 +79,11 @@ class LeaveController extends Controller
     {
         abort_unless($request->user()->can('leaves.create'), 403);
 
-        abort_unless($request->user()->employee, 403,
-            'Your account is not linked to an employee profile.');
+        abort_unless(
+            $request->user()->employee,
+            403,
+            'Your account is not linked to an employee profile.'
+        );
 
         return view('leaves.create');
     }
@@ -94,8 +97,11 @@ class LeaveController extends Controller
 
         $employee = $request->user()->employee;
 
-        abort_unless($employee, 403,
-            'Your account is not linked to an employee profile.');
+        abort_unless(
+            $employee,
+            403,
+            'Your account is not linked to an employee profile.'
+        );
 
         $validated = $request->validate([
             'leave_type' => [
@@ -120,6 +126,14 @@ class LeaveController extends Controller
             'total_days' => $totalDays,
             'reason' => $validated['reason'],
             'status' => 'pending',
+        ]);
+
+        // Catat aktivitas pengajuan cuti.
+        ActivityLog::create([
+            'user_id' => $request->user()->id,
+            'employee_id' => $employee->id,
+            'action' => 'leave_submitted',
+            'description' => $employee->full_name . ' mengajukan cuti ' . $validated['leave_type'] . '.',
         ]);
 
         return redirect()
@@ -168,6 +182,16 @@ class LeaveController extends Controller
             'review_notes' => $validated['review_notes'] ?? null,
         ]);
 
+        // Catat aktivitas persetujuan cuti.
+        ActivityLog::create([
+            'user_id' => $request->user()->id,
+            'employee_id' => $leave->employee_id,
+            'action' => 'leave_approved',
+            'description' => $request->user()->name
+                . ' menyetujui pengajuan cuti '
+                . $leave->employee->full_name . '.',
+        ]);
+
         return back()->with('success', 'Leave request approved successfully.');
     }
 
@@ -191,6 +215,16 @@ class LeaveController extends Controller
             'reviewed_by' => $request->user()->id,
             'reviewed_at' => now(),
             'review_notes' => $validated['review_notes'],
+        ]);
+
+        // Catat aktivitas penolakan cuti.
+        ActivityLog::create([
+            'user_id' => $request->user()->id,
+            'employee_id' => $leave->employee_id,
+            'action' => 'leave_rejected',
+            'description' => $request->user()->name
+                . ' menolak pengajuan cuti '
+                . $leave->employee->full_name . '.',
         ]);
 
         return back()->with('success', 'Leave request rejected successfully.');

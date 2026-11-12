@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Attendance;
 use App\Models\Department;
 use App\Models\Employee;
@@ -35,8 +36,7 @@ class DashboardController extends Controller
         $applyEmployeeScope = function (Builder $query) use (
             $isEmployee,
             $isManager,
-            $employeeId,
-            $user
+            $employeeId
         ) {
             if ($isEmployee) {
                 if ($employeeId) {
@@ -209,6 +209,25 @@ class DashboardController extends Controller
 
         $recentAttendances = $recentAttendanceQuery->get();
 
+        /*
+        |--------------------------------------------------------------------------
+        | Recent Activities
+        |--------------------------------------------------------------------------
+        */
+
+        $recentActivities = ActivityLog::with([
+            'employee',
+            'user',
+        ])
+            ->whereHas('employee', function (Builder $query) use (
+                $applyEmployeeScope
+            ) {
+                $applyEmployeeScope($query);
+            })
+            ->latest()
+            ->limit(8)
+            ->get();
+
         return view('dashboard', compact(
             'totalEmployees',
             'activeEmployees',
@@ -222,7 +241,8 @@ class DashboardController extends Controller
             'rejectedLeaves',
             'employeesByDepartment',
             'recentLeaves',
-            'recentAttendances'
+            'recentAttendances',
+            'recentActivities'
         ));
     }
 }

@@ -7,6 +7,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
+use App\Models\ActivityLog;
 
 class AttendanceController extends Controller
 {
@@ -117,6 +118,13 @@ class AttendanceController extends Controller
                 : 'present',
         ]);
 
+        ActivityLog::create([
+            'user_id' => $request->user()->id,
+            'employee_id' => $employee->id,
+            'action' => 'check_in',
+            'description' => $employee->full_name . ' melakukan check-in.',
+        ]);
+
         return back()->with(
             'success',
             'Check-in recorded successfully at ' . $now->format('H:i:s')
@@ -157,6 +165,13 @@ class AttendanceController extends Controller
         $attendance->update([
             'check_out' => $now,
         ]);
+
+        ActivityLog::create([
+        'user_id' => $request->user()->id,
+        'employee_id' => $employee->id,
+        'action' => 'check_out',
+        'description' => $employee->full_name . ' melakukan check-out.',
+    ]);
 
         return back()->with(
             'success',

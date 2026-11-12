@@ -234,6 +234,138 @@
 
         </div>
 
+
+        {{-- Recent Activities --}}
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">
+                        Recent Activities
+                    </h3>
+                    <p class="text-sm text-gray-500 mt-1">
+                        Latest activities recorded in PeopleHub.
+                    </p>
+                </div>
+
+                <span class="text-xs font-medium text-gray-500 bg-gray-100 px-3 py-1.5 rounded-full">
+                    Latest 8
+                </span>
+            </div>
+
+            @forelse ($recentActivities as $activity)
+                <div class="flex items-start gap-4 py-4 {{ !$loop->last ? 'border-b border-gray-100' : '' }}">
+
+                    {{-- Activity Icon --}}
+                    <div class="flex-shrink-0">
+                        @if ($activity->action === 'check_in')
+                            <div class="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 8v4l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                        @elseif ($activity->action === 'check_out')
+                            <div class="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M17 16l4-4m0 0l-4-4m4 4H9m4 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                </svg>
+                            </div>
+                        @elseif ($activity->action === 'leave_submitted')
+                            <div class="w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5l5 5v11a2 2 0 01-2 2z" />
+                                </svg>
+                            </div>
+                        @elseif ($activity->action === 'leave_approved')
+                            <div class="w-10 h-10 rounded-full bg-green-50 text-green-600 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M5 13l4 4L19 7" />
+                                </svg>
+                            </div>
+                        @elseif ($activity->action === 'leave_rejected')
+                            <div class="w-10 h-10 rounded-full bg-red-50 text-red-600 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </div>
+                        @else
+                            <div class="w-10 h-10 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center">
+                                <span class="text-sm font-semibold">A</span>
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- Activity Description --}}
+                    <div class="flex-1 min-w-0">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <p class="text-sm font-semibold text-gray-900">
+                                @switch($activity->action)
+                                    @case('check_in')
+                                        Check In
+                                        @break
+                                    @case('check_out')
+                                        Check Out
+                                        @break
+                                    @case('leave_submitted')
+                                        Leave Request Submitted
+                                        @break
+                                    @case('leave_approved')
+                                        Leave Request Approved
+                                        @break
+                                    @case('leave_rejected')
+                                        Leave Request Rejected
+                                        @break
+                                    @default
+                                        {{ ucfirst(str_replace('_', ' ', $activity->action)) }}
+                                @endswitch
+                            </p>
+
+                            <span class="text-xs text-gray-400">
+                                {{ $activity->created_at->diffForHumans() }}
+                            </span>
+                        </div>
+
+                        <p class="text-sm text-gray-600 mt-1">
+                            {{ $activity->description }}
+                        </p>
+
+                        @if ($activity->employee)
+                            <p class="text-xs text-gray-400 mt-1">
+                                {{ $activity->employee->employee_code }}
+                            </p>
+                        @endif
+                    </div>
+                </div>
+            @empty
+                <div class="py-10 text-center">
+                    <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-gray-400"
+                            fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M12 8v4l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+
+                    <p class="text-sm font-medium text-gray-700">
+                        No recent activities
+                    </p>
+                    <p class="text-xs text-gray-400 mt-1">
+                        Activities will appear here when users perform actions.
+                    </p>
+                </div>
+            @endforelse
+        </div>
+
+
         {{-- Recent Leave Requests --}}
         <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
 

@@ -18,10 +18,26 @@ class LeaveController extends Controller
     public function index(Request $request): View
     {
         $user = $request->user();
-        $query = Leave::with(['employee.department', 'employee.position', 'reviewer']);
 
-        // Employee hanya melihat pengajuan cuti miliknya.
-        if (!$user->can('leaves.approve')) {
+        $query = Leave::with([
+            'employee.department',
+            'employee.position',
+            'reviewer',
+        ]);
+
+        // Manager hanya melihat cuti dirinya dan anggota tim langsung.
+        if ($user->hasRole('Manager')) {
+            $employee = $user->employee;
+            abort_unless($employee, 403);
+
+            $query->whereHas('employee', function ($employeeQuery) use ($employee) {
+                $employeeQuery->where(function ($scope) use ($employee) {
+                    $scope->where('id', $employee->id)
+                        ->orWhere('manager_id', $employee->id);
+                });
+            });
+        } elseif (!$user->can('leaves.approve')) {
+            // Employee hanya melihat pengajuan cuti miliknya.
             $employee = $user->employee;
             abort_unless($employee, 403);
 
@@ -51,17 +67,44 @@ class LeaveController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        // Statistik sesuai cakupan data pengguna.
+        /*
+        |--------------------------------------------------------------------------
+        | Leave Statistics
+        |--------------------------------------------------------------------------
+        */
+
         $statsQuery = Leave::query();
 
-        if (!$user->can('leaves.approve')) {
-            $statsQuery->where('employee_id', $user->employee->id);
+        if ($user->hasRole('Manager')) {
+            $employee = $user->employee;
+            abort_unless($employee, 403);
+
+            $statsQuery->whereHas('employee', function ($employeeQuery) use ($employee) {
+                $employeeQuery->where(function ($scope) use ($employee) {
+                    $scope->where('id', $employee->id)
+                        ->orWhere('manager_id', $employee->id);
+                });
+            });
+        } elseif (!$user->can('leaves.approve')) {
+            $employee = $user->employee;
+            abort_unless($employee, 403);
+
+            $statsQuery->where('employee_id', $employee->id);
         }
 
         $totalRequests = (clone $statsQuery)->count();
-        $pendingRequests = (clone $statsQuery)->where('status', 'pending')->count();
-        $approvedRequests = (clone $statsQuery)->where('status', 'approved')->count();
-        $rejectedRequests = (clone $statsQuery)->where('status', 'rejected')->count();
+
+        $pendingRequests = (clone $statsQuery)
+            ->where('status', 'pending')
+            ->count();
+
+        $approvedRequests = (clone $statsQuery)
+            ->where('status', 'approved')
+            ->count();
+
+        $rejectedRequests = (clone $statsQuery)
+            ->where('status', 'rejected')
+            ->count();
 
         return view('leaves.index', compact(
             'leaves',
@@ -133,7 +176,9 @@ class LeaveController extends Controller
             'user_id' => $request->user()->id,
             'employee_id' => $employee->id,
             'action' => 'leave_submitted',
-            'description' => $employee->full_name . ' mengajukan cuti ' . $validated['leave_type'] . '.',
+            'description' => $employee->full_name
+                . ' mengajukan cuti '
+                . $validated['leave_type'] . '.',
         ]);
 
         return redirect()
@@ -148,14 +193,29 @@ class LeaveController extends Controller
     {
         $user = $request->user();
 
-        if (!$user->can('leaves.approve')) {
+        $leave->load([
+            'employee.department',
+            'employee.position',
+            'reviewer',
+        ]);
+
+        if ($user->hasRole('Manager')) {
+            $employee = $user->employee;
+
             abort_unless(
-                $user->employee && $leave->employee_id === $user->employee->id,
+                $employee && (
+                    $leave->employee_id === $employee->id ||
+                    $leave->employee?->manager_id === $employee->id
+                ),
+                403
+            );
+        } elseif (!$user->can('leaves.approve')) {
+            abort_unless(
+                $user->employee &&
+                $leave->employee_id === $user->employee->id,
                 403
             );
         }
-
-        $leave->load(['employee.department', 'employee.position', 'reviewer']);
 
         return view('leaves.show', compact('leave'));
     }
@@ -165,10 +225,26 @@ class LeaveController extends Controller
      */
     public function approve(Request $request, Leave $leave): RedirectResponse
     {
-        abort_unless($request->user()->can('leaves.approve'), 403);
+        $user = $request->user();
+
+        abort_unless($user->can('leaves.approve'), 403);
+
+        // Manager hanya boleh menyetujui cuti anggota tim langsung.
+        if ($user->hasRole('Manager')) {
+            $employee = $user->employee;
+
+            abort_unless(
+                $employee &&
+                $leave->employee?->manager_id === $employee->id,
+                403
+            );
+        }
 
         if ($leave->status !== 'pending') {
-            return back()->with('error', 'This leave request has already been reviewed.');
+            return back()->with(
+                'error',
+                'This leave request has already been reviewed.'
+            );
         }
 
         $validated = $request->validate([
@@ -177,22 +253,25 @@ class LeaveController extends Controller
 
         $leave->update([
             'status' => 'approved',
-            'reviewed_by' => $request->user()->id,
+            'reviewed_by' => $user->id,
             'reviewed_at' => now(),
             'review_notes' => $validated['review_notes'] ?? null,
         ]);
 
         // Catat aktivitas persetujuan cuti.
         ActivityLog::create([
-            'user_id' => $request->user()->id,
+            'user_id' => $user->id,
             'employee_id' => $leave->employee_id,
             'action' => 'leave_approved',
-            'description' => $request->user()->name
+            'description' => $user->name
                 . ' menyetujui pengajuan cuti '
                 . $leave->employee->full_name . '.',
         ]);
 
-        return back()->with('success', 'Leave request approved successfully.');
+        return back()->with(
+            'success',
+            'Leave request approved successfully.'
+        );
     }
 
     /**
@@ -200,10 +279,26 @@ class LeaveController extends Controller
      */
     public function reject(Request $request, Leave $leave): RedirectResponse
     {
-        abort_unless($request->user()->can('leaves.approve'), 403);
+        $user = $request->user();
+
+        abort_unless($user->can('leaves.approve'), 403);
+
+        // Manager hanya boleh menolak cuti anggota tim langsung.
+        if ($user->hasRole('Manager')) {
+            $employee = $user->employee;
+
+            abort_unless(
+                $employee &&
+                $leave->employee?->manager_id === $employee->id,
+                403
+            );
+        }
 
         if ($leave->status !== 'pending') {
-            return back()->with('error', 'This leave request has already been reviewed.');
+            return back()->with(
+                'error',
+                'This leave request has already been reviewed.'
+            );
         }
 
         $validated = $request->validate([
@@ -212,22 +307,25 @@ class LeaveController extends Controller
 
         $leave->update([
             'status' => 'rejected',
-            'reviewed_by' => $request->user()->id,
+            'reviewed_by' => $user->id,
             'reviewed_at' => now(),
             'review_notes' => $validated['review_notes'],
         ]);
 
         // Catat aktivitas penolakan cuti.
         ActivityLog::create([
-            'user_id' => $request->user()->id,
+            'user_id' => $user->id,
             'employee_id' => $leave->employee_id,
             'action' => 'leave_rejected',
-            'description' => $request->user()->name
+            'description' => $user->name
                 . ' menolak pengajuan cuti '
                 . $leave->employee->full_name . '.',
         ]);
 
-        return back()->with('success', 'Leave request rejected successfully.');
+        return back()->with(
+            'success',
+            'Leave request rejected successfully.'
+        );
     }
 
     /**
@@ -245,7 +343,10 @@ class LeaveController extends Controller
         );
 
         if ($leave->status !== 'pending') {
-            return back()->with('error', 'Only pending requests can be cancelled.');
+            return back()->with(
+                'error',
+                'Only pending requests can be cancelled.'
+            );
         }
 
         $leave->delete();

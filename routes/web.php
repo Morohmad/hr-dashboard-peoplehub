@@ -7,6 +7,7 @@ use App\Http\Controllers\PositionController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ReportsController;
 
 Route::get('/', function () {
     return redirect()->route('dashboard');
@@ -77,6 +78,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->middleware('permission:leaves.create')
                 ->name('destroy');
         });
+
+    // Reports
+    Route::get('/reports', [ReportsController::class, 'index'])
+        ->middleware('permission:reports.view')
+        ->name('reports.index');
+
+    Route::get('/reports/export', [ReportsController::class, 'export'])
+        ->middleware('permission:reports.export')
+        ->name('reports.export');
 
     // Payroll placeholder
     Route::middleware('permission:payroll.view')->group(function () {
